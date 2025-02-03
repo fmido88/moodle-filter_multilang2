@@ -127,8 +127,7 @@ async function filter(event) {
             args: {
                 contextid: contextid,
                 data: data,
-                loginrequired: false,
-            }
+            },
         }
     ]);
 
