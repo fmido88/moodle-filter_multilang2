@@ -110,7 +110,7 @@ async function filter(event) {
         $(element).parent().children()
                   .find('*')
                   // Exclude some tricky.
-                  .not('script, link, noscript, iframe, embed, input, head')
+                  .not('script, link, noscript, iframe, embed, input, head, textarea')
                   .each(function() {
 
             let current = $(this);
