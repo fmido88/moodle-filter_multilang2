@@ -22,7 +22,7 @@
  */
 import $ from 'jquery';
 import Ajax from 'core/ajax';
-import {eventTypes, notifyFilterContentRenderingComplete} from 'core_filters/events';
+import {eventTypes} from 'core_filters/events';
 
 let elements = [];
 let data = [];
@@ -129,15 +129,12 @@ async function filter(event) {
                 data: data,
             },
         }
-    ]);
+    ], true, false);
 
     let response = await requests[0];
     elements.forEach((element, index) => {
         $(element).text(response[index]);
     });
-
-    // Trigger events of what elements changed.
-    notifyFilterContentRenderingComplete(elements);
 
     elements = [];
     data = [];
