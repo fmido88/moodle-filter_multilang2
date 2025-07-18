@@ -32,6 +32,9 @@ class callbacks {
      */
     public static function apply_client_filter(\core\hook\output\before_footer_html_generation $hook) {
         global $PAGE;
+        if (during_initial_install()) {
+            return;
+        }
         $enabled = filter_is_enabled('multilang2') && !empty(get_config('filter_multilang2', 'clientfilter'));
         if ($enabled) {
             $PAGE->requires->js_call_amd('filter_multilang2/filter', 'init');
