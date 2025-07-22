@@ -60,6 +60,7 @@ class filter extends external_api {
         $filter = new text_filter();
         $data = array_map(function($text) use($filter): string {
             if (clean_param($text, PARAM_TEXT) != $text) {
+                // maybe escaped text.
                 return $text;
             }
             return $filter->filter($text);
@@ -73,7 +74,7 @@ class filter extends external_api {
      */
     public static function filter_content_returns(): external_multiple_structure {
         return new external_multiple_structure(
-            new external_value(PARAM_TEXT, 'filtered data')
+            new external_value(PARAM_RAW, 'filtered data')
         );
     }
 }

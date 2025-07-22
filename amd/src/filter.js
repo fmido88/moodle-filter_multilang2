@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * TODO describe module filter
+ * Apply multilang filter from the client side using ajax request.
  *
  * @module     filter_multilang2/filter
  * @copyright  2025 Mohammad Farouk <phun.for.physics@gmail.com>
@@ -22,13 +22,13 @@
  */
 import $ from 'jquery';
 import Ajax from 'core/ajax';
-import {eventTypes} from 'core_filters/events';
+import {eventTypes, notifyFilterContentRenderingComplete} from 'core_filters/events';
 
 let elements = [];
 let data = [];
 let onRequest = false;
 let queue = [];
-let retryInterval;
+let retryTimeout;
 
 /**
  * Queue filter event.
@@ -41,13 +41,18 @@ function queueFilter(event = null) {
     });
     runInterval();
 }
-
+/**
+ * Stopping the queue.
+ */
+function stopInterval() {
+    clearTimeout(retryTimeout);
+}
 /**
  * Rerun the interval to check for new data.
  */
 function runInterval() {
-    clearInterval(retryInterval);
-    retryInterval = setInterval(processQueue, 500);
+    stopInterval();
+    retryTimeout = setTimeout(processQueue, 500);
 }
 
 /**
@@ -55,7 +60,7 @@ function runInterval() {
  * @returns {void}
  */
 function processQueue() {
-    clearInterval(retryInterval);
+    clearTimeout(retryTimeout);
     if (queue.length == 0) {
         return;
     }
@@ -87,9 +92,9 @@ function processQueue() {
 
 /**
  * Process filtering.
- * @param {CustomEvent} event
+ * @param {?CustomEvent} event
  */
-async function filter(event) {
+async function filter(event = null) {
     if (onRequest) {
         queueFilter(event);
         return;
@@ -97,29 +102,77 @@ async function filter(event) {
 
     onRequest = true;
     let contextid = M.cfg.contextid;
-    let selector;
+    let selectors;
     if (event && event.originalEvent && event.originalEvent.detail.nodes) {
-        selector = event.originalEvent.detail.nodes;
+        selectors = event.originalEvent.detail.nodes;
     } else {
-        selector = ['body'];
+        selectors = ['body'];
     }
 
-    $.each(selector, function(index, element) {
-        // Get the element and its siblings.
-        // Modal not including footer and header in the event.
-        $(element).parent().children()
-                  .find('*')
-                  // Exclude some tricky.
-                  .not('script, link, noscript, iframe, embed, input, head, textarea')
-                  .each(function() {
+    $.each(selectors, function(index, element) {
 
-            let current = $(this);
-            if (current.children().length == 0 && current.text().toLowerCase().includes('mlang')) {
-                elements.push(this);
-                data.push(current.text());
+        // Exclude head and scripts.
+        let exclude = 'script, noscript, head, style';
+        // Exclude resources.
+        exclude += ', img, video, audio, canvas, svg, object, embed, iframe, link, source';
+        // Exclude inputs.
+        exclude += ', input, textarea, [data-fieldtype="textarea"], [data-fieldtype="editor"]';
+        // Exclude editable elements as it considered inputs.
+        exclude += ', [contenteditable="true"]';
+        // Exclude display elements.
+        exclude += ', code, pre';
+        // Manually ignored.
+        exclude += ', .ignore-multilang';
+
+        // Get the element and its siblings.
+        // Modal event for example not include footer and header in the event nodes.
+        $(element)
+        .parent().not(exclude)
+        .children().not(exclude)
+        .find('*').not(exclude)
+        .each(function() {
+            let parent = $(this);
+            if (parent.parents(exclude).length > 0) {
+                return;
             }
+
+            parent.contents().each(function() {
+                if (this.nodeType === 3) { // Text node.
+                    if (this.textContent.toLowerCase().includes('mlang')) {
+                        elements.push(this);
+                        data.push(this.textContent);
+                    }
+                } else if (this.nodeType === 1) { // Element node.
+                    let current = $(this);
+
+                    if (current.is(exclude)) {
+                        return;
+                    }
+
+                    if (current.children().length > 0) { // Only check final child.
+                        return;
+                    }
+
+                    if (elements.includes(this)) { // Already added.
+                        return;
+                    }
+
+                    if (current.text().toLowerCase().includes('mlang')) {
+                        elements.push(this);
+                        data.push(current.text());
+                    }
+                }
+            });
         });
     });
+
+    if (data.length == 0) {
+        elements = [];
+        data = [];
+        onRequest = false;
+        // Prevent sending empty data request.
+        return;
+    }
 
     let requests = Ajax.call([
         {
@@ -133,8 +186,15 @@ async function filter(event) {
 
     let response = await requests[0];
     elements.forEach((element, index) => {
-        $(element).text(response[index]);
+        if (element.nodeType === 3) {
+            element.textContent = response[index];
+        } else {
+            $(element).text(response[index]);
+        }
     });
+
+    // Trigger events of what elements changed.
+    notifyFilterContentRenderingComplete(elements);
 
     elements = [];
     data = [];
