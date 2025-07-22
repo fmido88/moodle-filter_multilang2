@@ -149,7 +149,7 @@ async function filter(event = null) {
                         return;
                     }
 
-                    if (current.children().length > 0) { // Only check final child.
+                    if (this.childNodes.length > 0) { // Only check final child.
                         return;
                     }
 
